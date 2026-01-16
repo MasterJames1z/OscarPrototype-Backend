@@ -62,7 +62,7 @@ app.get('/api/product-prices', async (req, res) => {
     }
 });
 
-// Create product price
+// Create product price (UPSERT)
 app.post('/api/product-prices', async (req, res) => {
     try {
         const { ProductID, EffectiveDate, ToDate, UnitPrice } = req.body;
@@ -86,6 +86,32 @@ app.post('/api/product-prices', async (req, res) => {
                 END
             `);
         res.status(201).json({ message: 'Price set successfully' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Update product price by ID
+app.put('/api/product-prices/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { ProductID, EffectiveDate, ToDate, UnitPrice } = req.body;
+        const pool = await poolPromise;
+        await pool.request()
+            .input('PriceID', sql.Int, id)
+            .input('ProductID', sql.Int, ProductID)
+            .input('EffectiveDate', sql.Date, EffectiveDate)
+            .input('ToDate', sql.Date, ToDate || null)
+            .input('UnitPrice', sql.Decimal(10, 2), UnitPrice)
+            .query(`
+                UPDATE S6_WeightBridge_ProductPrices 
+                SET ProductID = ISNULL(@ProductID, ProductID),
+                    EffectiveDate = ISNULL(@EffectiveDate, EffectiveDate),
+                    ToDate = @ToDate,
+                    UnitPrice = ISNULL(@UnitPrice, UnitPrice)
+                WHERE PriceID = @PriceID
+            `);
+        res.json({ message: 'Price updated successfully' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
